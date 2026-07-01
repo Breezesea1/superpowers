@@ -52,6 +52,109 @@ const normalizePath = (p, homeDir) => {
 // every agent step.  See #1202 for the full analysis.
 let _bootstrapCache = undefined; // undefined = not yet loaded, null = file missing
 
+const recommendedAgents = {
+  'superpowers-orchestrator': {
+    description: 'Primary Superpowers agent that selects skills and delegates work to focused sp-* subagents.',
+    mode: 'primary',
+    prompt: 'You coordinate Superpowers workflows for OpenCode. Invoke required skills before acting, keep the user informed, and delegate focused work to the sp-* subagents when that improves quality or parallelism.',
+    permission: {
+      skill: 'allow',
+      todowrite: 'allow',
+      task: {
+        '*': 'deny',
+        'sp-*': 'allow',
+      },
+      edit: 'ask',
+      bash: 'ask',
+      webfetch: 'ask',
+    },
+  },
+  'sp-explorer': {
+    description: 'Read-only repository exploration and codebase mapping.',
+    mode: 'subagent',
+    prompt: 'Explore the repository without editing. Return concise findings with relevant file paths, architecture notes, and risks.',
+    permission: {
+      read: 'allow',
+      glob: 'allow',
+      grep: 'allow',
+      bash: 'ask',
+      edit: 'deny',
+    },
+  },
+  'sp-debugger': {
+    description: 'Systematic debugging, reproduction, and root-cause analysis.',
+    mode: 'subagent',
+    prompt: 'Debug systematically. Reproduce failures when possible, gather evidence, identify root cause, and recommend the smallest correct fix.',
+    permission: {
+      read: 'allow',
+      glob: 'allow',
+      grep: 'allow',
+      bash: 'allow',
+      edit: 'deny',
+    },
+  },
+  'sp-planner': {
+    description: 'Read-only implementation planning after requirements are understood.',
+    mode: 'subagent',
+    prompt: 'Create implementation plans only. Do not edit files. Include exact files, sequencing, tests, risks, and review checkpoints.',
+    permission: {
+      read: 'allow',
+      glob: 'allow',
+      grep: 'allow',
+      bash: 'ask',
+      edit: 'deny',
+    },
+  },
+  'sp-implementer': {
+    description: 'Focused implementation agent for scoped coding tasks.',
+    mode: 'subagent',
+    prompt: 'Implement the assigned task only. Prefer minimal changes, keep style consistent, and verify the changed behavior when practical.',
+    permission: {
+      read: 'allow',
+      glob: 'allow',
+      grep: 'allow',
+      edit: 'allow',
+      bash: 'allow',
+      skill: 'allow',
+      todowrite: 'allow',
+    },
+  },
+  'sp-reviewer': {
+    description: 'Read-only review for bugs, regressions, missing tests, and maintainability risks.',
+    mode: 'subagent',
+    prompt: 'Review changes without editing. Prioritize findings by severity with file references, then list residual risks and missing verification.',
+    permission: {
+      read: 'allow',
+      glob: 'allow',
+      grep: 'allow',
+      bash: 'ask',
+      edit: 'deny',
+    },
+  },
+  'sp-docs-researcher': {
+    description: 'Research current library, framework, API, and community documentation.',
+    mode: 'subagent',
+    prompt: 'Research external documentation and community examples. Return source-backed findings, current API details, and practical recommendations.',
+    permission: {
+      webfetch: 'allow',
+      bash: 'ask',
+      read: 'allow',
+      glob: 'allow',
+      grep: 'allow',
+      edit: 'deny',
+    },
+  },
+};
+
+const registerRecommendedAgents = (config) => {
+  config.agent = config.agent || {};
+  for (const [name, agent] of Object.entries(recommendedAgents)) {
+    if (!Object.prototype.hasOwnProperty.call(config.agent, name)) {
+      config.agent[name] = agent;
+    }
+  }
+};
+
 export const SuperpowersPlugin = async ({ client, directory }) => {
   const homeDir = os.homedir();
   const superpowersSkillsDir = path.resolve(__dirname, '../../skills');
@@ -76,7 +179,13 @@ export const SuperpowersPlugin = async ({ client, directory }) => {
     const toolMapping = `**Tool Mapping for OpenCode:**
 When skills request actions, substitute OpenCode equivalents:
 - Create or update todos → \`todowrite\`
-- \`Subagent (general-purpose):\` → \`task\` with \`subagent_type: "general"\`
+- Dispatch a subagent → use \`task\` with the focused \`sp-*\` agents registered by this plugin
+- Codebase exploration → prefer \`sp-explorer\`
+- Debugging → prefer \`sp-debugger\`
+- Planning → prefer \`sp-planner\`
+- Implementation → prefer \`sp-implementer\`
+- Review → prefer \`sp-reviewer\`
+- Documentation or community research → prefer \`sp-docs-researcher\`
 - Invoke a skill → OpenCode's native \`skill\` tool
 - Read files → \`read\`
 - Create, edit, or delete files → \`apply_patch\`
@@ -110,6 +219,7 @@ ${toolMapping}
       if (!config.skills.paths.includes(superpowersSkillsDir)) {
         config.skills.paths.push(superpowersSkillsDir);
       }
+      registerRecommendedAgents(config);
     },
 
     // Inject bootstrap into the first user message of each session.

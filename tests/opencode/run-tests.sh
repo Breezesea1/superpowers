@@ -4,7 +4,19 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$SCRIPT_DIR"
+
+if [ -z "${NODE_BIN:-}" ]; then
+    NODE_BIN="$(command -v node || bash -lc 'command -v node' || command -v node.exe || true)"
+fi
+
+if [ -z "$NODE_BIN" ]; then
+    echo "Node.js not found. Set NODE_BIN to the node executable path."
+    exit 1
+fi
+
+export NODE_BIN
 
 echo "========================================"
 echo " OpenCode Plugin Test Suite"
@@ -61,6 +73,7 @@ done
 tests=(
     "test-plugin-loading.sh"
     "test-bootstrap-caching.sh"
+    "test-agent-registration.mjs"
 )
 
 # Integration tests (require OpenCode)
@@ -98,7 +111,15 @@ for test in "${tests[@]}"; do
         continue
     fi
 
-    if [ ! -x "$test_path" ]; then
+    if [[ "$test" == *.mjs ]]; then
+        runner=("$NODE_BIN" "$test_path")
+        runner_args=("$REPO_ROOT/.opencode/plugins/superpowers.js")
+    else
+        runner=(bash "$test_path")
+        runner_args=()
+    fi
+
+    if [[ "$test" != *.mjs && ! -x "$test_path" ]]; then
         echo "  Making $test executable..."
         chmod +x "$test_path"
     fi
@@ -106,7 +127,7 @@ for test in "${tests[@]}"; do
     start_time=$(date +%s)
 
     if [ "$VERBOSE" = true ]; then
-        if bash "$test_path"; then
+        if "${runner[@]}" "${runner_args[@]}"; then
             end_time=$(date +%s)
             duration=$((end_time - start_time))
             echo ""
@@ -121,7 +142,7 @@ for test in "${tests[@]}"; do
         fi
     else
         # Capture output for non-verbose mode
-        if output=$(bash "$test_path" 2>&1); then
+        if output=$("${runner[@]}" "${runner_args[@]}" 2>&1); then
             end_time=$(date +%s)
             duration=$((end_time - start_time))
             echo "  [PASS] (${duration}s)"

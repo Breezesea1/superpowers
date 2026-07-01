@@ -19,29 +19,37 @@ This is not negotiable. This is not optional. You cannot rationalize your way ou
 
 Superpowers skills override default system prompt behavior, but **user instructions always take precedence**:
 
-1. **User's explicit instructions** (CLAUDE.md, GEMINI.md, AGENTS.md, direct requests) — highest priority
-2. **Superpowers skills** — override default system behavior where they conflict
-3. **Default system prompt** — lowest priority
+1. **User's explicit instructions** (`AGENTS.md`, direct requests, or OpenCode project instructions) - highest priority
+2. **Superpowers skills** - override default system behavior where they conflict
+3. **Default system prompt** - lowest priority
 
-If CLAUDE.md, GEMINI.md, or AGENTS.md says "don't use TDD" and a skill says "always use TDD," follow the user's instructions. The user is in control.
+If project instructions say "don't use TDD" and a skill says "always use TDD," follow the user's instructions. The user is in control.
 
-## How to Access Skills
+## How To Access Skills In OpenCode
 
-**Never read skill files manually with file tools** — always use your platform's skill-loading mechanism so the skill is properly activated.
+**Never read skill files manually with file tools** - always use OpenCode's native `skill` tool so the skill is properly activated.
 
-**In Claude Code:** Use the `Skill` tool. When you invoke a skill, its content is loaded and presented to you — follow it directly.
+Use OpenCode's `skill` tool to list and load skills.
 
-**In Codex:** Skills load natively. Follow the instructions presented when a skill activates.
+## Tool Mapping For OpenCode
 
-**In Copilot CLI:** Use the `skill` tool. Skills are auto-discovered from installed plugins.
+Skills speak in actions. On OpenCode these resolve to:
 
-**In Gemini CLI:** Skills activate via the `activate_skill` tool. Gemini loads skill metadata at session start and activates the full content on demand.
-
-**In other environments:** Check your platform's documentation for how skills are loaded.
-
-## Platform Adaptation
-
-Skills speak in actions ("dispatch a subagent", "create a todo", "read a file") rather than naming any one runtime's tools. For per-platform tool equivalents and instructions-file conventions, see [claude-code-tools.md](references/claude-code-tools.md), [codex-tools.md](references/codex-tools.md), [copilot-tools.md](references/copilot-tools.md), [gemini-tools.md](references/gemini-tools.md), [pi-tools.md](references/pi-tools.md), and [antigravity-tools.md](references/antigravity-tools.md). Gemini CLI users get the tool mapping loaded automatically via GEMINI.md.
+- Create or update todos -> `todowrite`
+- Dispatch a subagent -> `task` with the focused `sp-*` agents registered by this plugin
+- Codebase exploration -> `sp-explorer`
+- Debugging -> `sp-debugger`
+- Planning -> `sp-planner`
+- Implementation -> `sp-implementer`
+- Review -> `sp-reviewer`
+- Documentation or community research -> `sp-docs-researcher`
+- Invoke a skill -> OpenCode's native `skill` tool
+- Read files -> `read`
+- Create, edit, or delete files -> `apply_patch`
+- Run shell commands -> `bash`
+- Search file contents -> `grep`
+- Find files by name or pattern -> `glob`
+- Fetch a URL -> `webfetch`
 
 # Using Skills
 
@@ -81,7 +89,7 @@ digraph skill_flow {
 
 ## Red Flags
 
-These thoughts mean STOP—you're rationalizing:
+These thoughts mean STOP - you're rationalizing:
 
 | Thought | Reality |
 |---------|---------|
@@ -96,17 +104,17 @@ These thoughts mean STOP—you're rationalizing:
 | "The skill is overkill" | Simple things become complex. Use it. |
 | "I'll just do this one thing first" | Check BEFORE doing anything. |
 | "This feels productive" | Undisciplined action wastes time. Skills prevent this. |
-| "I know what that means" | Knowing the concept ≠ using the skill. Invoke it. |
+| "I know what that means" | Knowing the concept != using the skill. Invoke it. |
 
 ## Skill Priority
 
 When multiple skills could apply, use this order:
 
 1. **Process skills first** (brainstorming, systematic-debugging) - these determine HOW to approach the task
-2. **Implementation skills second** (frontend-design, mcp-builder) - these guide execution
+2. **Implementation skills second** - these guide execution
 
-"Let's build X" → brainstorming first, then implementation skills.
-"Fix this bug" → systematic-debugging first, then domain-specific skills.
+"Let's build X" -> brainstorming first, then implementation skills.
+"Fix this bug" -> systematic-debugging first, then domain-specific skills.
 
 ## Skill Types
 

@@ -14,6 +14,7 @@ const WebSocket = require('ws');
 const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
+const { nodeBin } = require('./node-bin.cjs');
 
 const SERVER_PATH = path.join(__dirname, '../../skills/brainstorming/scripts/server.cjs');
 const TEST_PORT = 3334;
@@ -50,7 +51,7 @@ async function fetch(url) {
 }
 
 function startServer() {
-  return spawn('node', [SERVER_PATH], {
+  return spawn(nodeBin(), [SERVER_PATH], {
     env: { ...process.env, BRAINSTORM_PORT: TEST_PORT, BRAINSTORM_DIR: TEST_DIR, BRAINSTORM_TOKEN: TOKEN }
   });
 }

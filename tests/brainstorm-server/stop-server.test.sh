@@ -9,6 +9,12 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 STOP="$SCRIPT_DIR/../../skills/brainstorming/scripts/stop-server.sh"
 SERVER="$SCRIPT_DIR/../../skills/brainstorming/scripts/server.cjs"
+NODE_BIN="${NODE_BIN:-$(command -v node || bash -lc 'command -v node' || command -v node.exe || true)}"
+
+if [[ -z "$NODE_BIN" ]]; then
+  echo "Node.js not found. Set NODE_BIN to the node executable path."
+  exit 1
+fi
 
 PASS=0; FAIL=0
 PIDS=()
@@ -64,7 +70,7 @@ fi
 SESS="$(mktemp -d)"; track_dir "$SESS"; mkdir -p "$SESS/content" "$SESS/state"
 SERVER_ID="$(new_server_id)"
 printf '%s\n' "$SERVER_ID" > "$SESS/state/server-instance-id"
-BRAINSTORM_DIR="$SESS" BRAINSTORM_PORT=3399 node "$SERVER" "--brainstorm-server-id=$SERVER_ID" > /dev/null 2>&1 &
+BRAINSTORM_DIR="$SESS" BRAINSTORM_PORT=3399 "$NODE_BIN" "$SERVER" "--brainstorm-server-id=$SERVER_ID" > /dev/null 2>&1 &
 SRV=$!
 track_pid "$SRV"
 disown "$SRV" 2>/dev/null || true
@@ -88,7 +94,7 @@ fi
 SESS="$(mktemp -d "$SCRIPT_DIR/.stop-persistent.XXXXXX")"; track_dir "$SESS"; mkdir -p "$SESS/content" "$SESS/state"
 SERVER_ID="$(new_server_id)"
 printf '%s\n' "$SERVER_ID" > "$SESS/state/server-instance-id"
-BRAINSTORM_DIR="$SESS" BRAINSTORM_PORT=0 node "$SERVER" "--brainstorm-server-id=$SERVER_ID" > /dev/null 2>&1 &
+BRAINSTORM_DIR="$SESS" BRAINSTORM_PORT=0 "$NODE_BIN" "$SERVER" "--brainstorm-server-id=$SERVER_ID" > /dev/null 2>&1 &
 SRV=$!
 track_pid "$SRV"
 disown "$SRV" 2>/dev/null || true

@@ -14,11 +14,33 @@ const WebSocket = require('ws');
 const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
+const { nodeBin } = require('./node-bin.cjs');
 
 const SERVER = path.join(__dirname, '../../skills/brainstorming/scripts/server.cjs');
 const START = path.join(__dirname, '../../skills/brainstorming/scripts/start-server.sh');
 const STOP = path.join(__dirname, '../../skills/brainstorming/scripts/stop-server.sh');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+function shellPath(filePath) {
+  if (process.platform !== 'win32') return filePath;
+  const match = String(filePath).match(/^([A-Za-z]):\\(.*)$/);
+  if (!match) return filePath;
+  return `/mnt/${match[1].toLowerCase()}/${match[2].replaceAll('\\', '/')}`;
+}
+
+function bashQuote(value) {
+  return `'${String(value).replaceAll("'", "'\\''")}'`;
+}
+
+function execStartServerWithBash(args) {
+  const command = `NODE_BIN="$(for node in $(which -a node 2>/dev/null); do case "$node" in /mnt/c/*|/mnt/cygdrive/*) continue ;; *) printf '%s\\n' "$node"; break ;; esac; done)"; export NODE_BIN; exec ${[shellPath(START), ...args].map(bashQuote).join(' ')}`;
+  return execFileSync('bash', ['-lc', command], { encoding: 'utf8' });
+}
+
+function execStopServerWithBash(sessionDir) {
+  const command = `NODE_BIN="$(for node in $(which -a node 2>/dev/null); do case "$node" in /mnt/c/*|/mnt/cygdrive/*) continue ;; *) printf '%s\\n' "$node"; break ;; esac; done)"; export NODE_BIN; exec ${[shellPath(STOP), sessionDir].map(bashQuote).join(' ')}`;
+  return execFileSync('bash', ['-lc', command], { stdio: 'ignore' });
+}
 
 function waitForExit(child, timeoutMs = 2000) {
   if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve(true);
@@ -110,12 +132,8 @@ function removeShellPath(p) {
 }
 
 function newestSessionDir(projectDir) {
-  const sessionDir = execFileSync('bash', [
-    '-lc',
-    'find "$1/.superpowers/brainstorm" -mindepth 1 -maxdepth 1 -type d -print | sort | tail -1',
-    'bash',
-    projectDir
-  ], { encoding: 'utf8' }).trim();
+  const root = `${projectDir}/.superpowers/brainstorm`;
+  const sessionDir = execFileSync('bash', ['-lc', `find ${bashQuote(root)} -mindepth 1 -maxdepth 1 -type d -print | sort | tail -1`], { encoding: 'utf8' }).trim();
   assert(sessionDir, `expected at least one session dir under ${projectDir}/.superpowers/brainstorm`);
   return sessionDir;
 }
@@ -129,7 +147,7 @@ async function runTests() {
 
   await test('server-info reports the configured idle_timeout_ms', async () => {
     const dir = fs.mkdtempSync('/tmp/bs-life-');
-    const srv = spawn('node', [SERVER], { env: { ...process.env, BRAINSTORM_PORT: 3401, BRAINSTORM_DIR: dir, BRAINSTORM_IDLE_TIMEOUT_MS: 1234567 } });
+    const srv = spawn(nodeBin(), [SERVER], { env: { ...process.env, BRAINSTORM_PORT: 3401, BRAINSTORM_DIR: dir, BRAINSTORM_IDLE_TIMEOUT_MS: 1234567 } });
     let out = ''; srv.stdout.on('data', d => out += d.toString());
     for (let i = 0; i < 60 && !out.includes('server-started'); i++) await sleep(50);
     try {
@@ -143,7 +161,7 @@ async function runTests() {
 
   await test('idle shutdown closes an open WebSocket and the process exits', async () => {
     const dir = fs.mkdtempSync('/tmp/bs-life-');
-    const srv = spawn('node', [SERVER], { env: { ...process.env, BRAINSTORM_PORT: 3402, BRAINSTORM_DIR: dir, BRAINSTORM_TOKEN: 'lifetoken', BRAINSTORM_IDLE_TIMEOUT_MS: 200, BRAINSTORM_LIFECYCLE_CHECK_MS: 100 } });
+    const srv = spawn(nodeBin(), [SERVER], { env: { ...process.env, BRAINSTORM_PORT: 3402, BRAINSTORM_DIR: dir, BRAINSTORM_TOKEN: 'lifetoken', BRAINSTORM_IDLE_TIMEOUT_MS: 200, BRAINSTORM_LIFECYCLE_CHECK_MS: 100 } });
     let out = ''; srv.stdout.on('data', d => out += d.toString());
     let exited = false, code = null; srv.on('exit', c => { exited = true; code = c; });
     for (let i = 0; i < 60 && !out.includes('server-started'); i++) await sleep(50);
@@ -169,30 +187,21 @@ async function runTests() {
   await test('start-server.sh --idle-timeout-minutes sets the timeout', async () => {
     const dir = makeShellTempDir('bs-life');
     let info = null;
-    let startProcess = null;
     let sessionDir = null;
     try {
-      if (isWindowsLikeShell()) {
-        startProcess = spawn('bash', [START, '--project-dir', dir, '--idle-timeout-minutes', '5']);
-        info = firstServerStarted(await waitForStartedOutput(startProcess));
-      } else {
-        const out = execFileSync('bash', [START, '--project-dir', dir, '--idle-timeout-minutes', '5', '--background'], { encoding: 'utf8' });
-        info = firstServerStarted(out);
-      }
+      const out = execStartServerWithBash(['--project-dir', dir, '--idle-timeout-minutes', '5', '--background']);
+      info = firstServerStarted(out);
       sessionDir = newestSessionDir(dir);
       assert.strictEqual(info.idle_timeout_ms, 5 * 60 * 1000, '5 minutes -> 300000 ms');
     } finally {
-      if (sessionDir) execFileSync('bash', [STOP, sessionDir], { stdio: 'ignore' });
-      if (startProcess && !await waitForExit(startProcess, 3000)) {
-        await killAndWait(startProcess);
-      }
+      if (sessionDir) execStopServerWithBash(sessionDir);
       removeShellPath(dir);
     }
   });
 
   await test('server-started URL brackets IPv6 URL hosts', async () => {
     const dir = fs.mkdtempSync('/tmp/bs-ipv6-url-');
-    const srv = spawn('node', [SERVER], {
+    const srv = spawn(nodeBin(), [SERVER], {
       env: {
         ...process.env,
         BRAINSTORM_PORT: 3421,
@@ -220,7 +229,7 @@ async function runTests() {
     const tokenFile = path.join(dir, '.last-token');
     const env = { ...process.env, BRAINSTORM_PORT_FILE: portFile, BRAINSTORM_TOKEN_FILE: tokenFile, BRAINSTORM_LIFECYCLE_CHECK_MS: 100000 };
 
-    const a = spawn('node', [SERVER], { env: { ...env, BRAINSTORM_DIR: path.join(dir, 's1') } });
+    const a = spawn(nodeBin(), [SERVER], { env: { ...env, BRAINSTORM_DIR: path.join(dir, 's1') } });
     let outA = ''; a.stdout.on('data', d => outA += d.toString());
     for (let i = 0; i < 60 && !outA.includes('server-started'); i++) await sleep(50);
     const infoA = firstServerStarted(outA);
@@ -230,7 +239,7 @@ async function runTests() {
     a.kill();
     assert(await exitedA, 'first server should exit before restart binds its port');
 
-    const b = spawn('node', [SERVER], { env: { ...env, BRAINSTORM_DIR: path.join(dir, 's2') } });
+    const b = spawn(nodeBin(), [SERVER], { env: { ...env, BRAINSTORM_DIR: path.join(dir, 's2') } });
     let outB = ''; b.stdout.on('data', d => outB += d.toString());
     for (let i = 0; i < 60 && !outB.includes('server-started'); i++) await sleep(50);
     const infoB = firstServerStarted(outB);
@@ -253,7 +262,7 @@ async function runTests() {
     try {
       fs.writeFileSync(tokenFile, token, { mode: 0o644 });
       fs.chmodSync(tokenFile, 0o644);
-      srv = spawn('node', [SERVER], {
+      srv = spawn(nodeBin(), [SERVER], {
         env: {
           ...process.env,
           BRAINSTORM_DIR: path.join(dir, 's1'),
@@ -286,7 +295,7 @@ async function runTests() {
     let a = null, b = null, ws = null;
 
     try {
-      a = spawn('node', [SERVER], { env: { ...env, BRAINSTORM_DIR: path.join(dir, 's1') } });
+      a = spawn(nodeBin(), [SERVER], { env: { ...env, BRAINSTORM_DIR: path.join(dir, 's1') } });
       let outA = ''; a.stdout.on('data', d => outA += d.toString());
       for (let i = 0; i < 60 && !outA.includes('server-started'); i++) await sleep(50);
       const infoA = firstServerStarted(outA);
@@ -296,7 +305,7 @@ async function runTests() {
       assert(await exitedA, 'first server should exit before restart binds its port');
       a = null;
 
-      b = spawn('node', [SERVER], { env: { ...env, BRAINSTORM_DIR: path.join(dir, 's2') } });
+      b = spawn(nodeBin(), [SERVER], { env: { ...env, BRAINSTORM_DIR: path.join(dir, 's2') } });
       let outB = ''; b.stdout.on('data', d => outB += d.toString());
       for (let i = 0; i < 60 && !outB.includes('server-started'); i++) await sleep(50);
       const infoB = firstServerStarted(outB);
@@ -324,12 +333,12 @@ async function runTests() {
     const dir = fs.mkdtempSync('/tmp/bs-port-');
     const portFile = path.join(dir, '.last-port');
 
-    const a = spawn('node', [SERVER], { env: { ...process.env, BRAINSTORM_DIR: path.join(dir, 'a'), BRAINSTORM_PORT: 3415, BRAINSTORM_LIFECYCLE_CHECK_MS: 100000 } });
+    const a = spawn(nodeBin(), [SERVER], { env: { ...process.env, BRAINSTORM_DIR: path.join(dir, 'a'), BRAINSTORM_PORT: 3415, BRAINSTORM_LIFECYCLE_CHECK_MS: 100000 } });
     let outA = ''; a.stdout.on('data', d => outA += d.toString());
     for (let i = 0; i < 60 && !outA.includes('server-started'); i++) await sleep(50);
 
     fs.writeFileSync(portFile, '3415'); // preferred port, but it's taken by A
-    const b = spawn('node', [SERVER], { env: { ...process.env, BRAINSTORM_DIR: path.join(dir, 'b'), BRAINSTORM_PORT_FILE: portFile, BRAINSTORM_LIFECYCLE_CHECK_MS: 100000 } });
+    const b = spawn(nodeBin(), [SERVER], { env: { ...process.env, BRAINSTORM_DIR: path.join(dir, 'b'), BRAINSTORM_PORT_FILE: portFile, BRAINSTORM_LIFECYCLE_CHECK_MS: 100000 } });
     let outB = ''; b.stdout.on('data', d => outB += d.toString());
     for (let i = 0; i < 60 && !outB.includes('server-started'); i++) await sleep(50);
     const portB = firstServerStarted(outB).port;
@@ -354,7 +363,7 @@ async function runTests() {
     let a = null, b = null;
 
     try {
-      a = spawn('node', [SERVER], {
+      a = spawn(nodeBin(), [SERVER], {
         env: {
           ...process.env,
           BRAINSTORM_DIR: path.join(dir, 'a'),
@@ -370,7 +379,7 @@ async function runTests() {
       fs.writeFileSync(portFile, '3422');
       fs.writeFileSync(tokenFile, preferredToken, { mode: 0o600 });
 
-      b = spawn('node', [SERVER], {
+      b = spawn(nodeBin(), [SERVER], {
         env: {
           ...process.env,
           BRAINSTORM_DIR: path.join(dir, 'b'),
@@ -404,7 +413,7 @@ async function runTests() {
     let a = null, b = null;
 
     try {
-      a = spawn('node', [SERVER], {
+      a = spawn(nodeBin(), [SERVER], {
         env: {
           ...process.env,
           BRAINSTORM_DIR: path.join(dir, 'a'),
@@ -418,7 +427,7 @@ async function runTests() {
       assert(outA.includes('server-started'), 'preferred-port server should start');
 
       fs.writeFileSync(portFile, '3423');
-      b = spawn('node', [SERVER], {
+      b = spawn(nodeBin(), [SERVER], {
         env: {
           ...process.env,
           BRAINSTORM_DIR: path.join(dir, 'b'),
@@ -448,7 +457,7 @@ async function runTests() {
     const dir = fs.mkdtempSync('/tmp/bs-open-');
     const marker = path.join(dir, 'opened.log');
     const openCmd = openCaptureCommand(dir, marker); // capture the launch instead of opening a browser
-    const srv = spawn('node', [SERVER], { env: { ...process.env, BRAINSTORM_PORT: 3417, BRAINSTORM_DIR: dir, BRAINSTORM_OPEN: '1', BRAINSTORM_OPEN_CMD: openCmd, BRAINSTORM_LIFECYCLE_CHECK_MS: 100000 } });
+    const srv = spawn(nodeBin(), [SERVER], { env: { ...process.env, BRAINSTORM_PORT: 3417, BRAINSTORM_DIR: dir, BRAINSTORM_OPEN: '1', BRAINSTORM_OPEN_CMD: openCmd, BRAINSTORM_LIFECYCLE_CHECK_MS: 100000 } });
     let out = ''; srv.stdout.on('data', d => out += d.toString());
     for (let i = 0; i < 60 && !out.includes('server-started'); i++) await sleep(50);
 
@@ -479,7 +488,7 @@ async function runTests() {
     const marker = path.join(dir, 'opened.log');
     const openCmd = openCaptureCommand(dir, marker);
     // BRAINSTORM_OPEN intentionally NOT set — auto-open must stay off.
-    const srv = spawn('node', [SERVER], { env: { ...process.env, BRAINSTORM_PORT: 3418, BRAINSTORM_DIR: dir, BRAINSTORM_OPEN_CMD: openCmd, BRAINSTORM_LIFECYCLE_CHECK_MS: 100000 } });
+    const srv = spawn(nodeBin(), [SERVER], { env: { ...process.env, BRAINSTORM_PORT: 3418, BRAINSTORM_DIR: dir, BRAINSTORM_OPEN_CMD: openCmd, BRAINSTORM_LIFECYCLE_CHECK_MS: 100000 } });
     let out = ''; srv.stdout.on('data', d => out += d.toString());
     for (let i = 0; i < 60 && !out.includes('server-started'); i++) await sleep(50);
     fs.writeFileSync(path.join(dir, 'content', 'first.html'), '<h2>First</h2>');
@@ -492,7 +501,7 @@ async function runTests() {
 
   await test('unauthenticated requests do not defeat the idle timeout', async () => {
     const dir = fs.mkdtempSync('/tmp/bs-life-');
-    const srv = spawn('node', [SERVER], { env: { ...process.env, BRAINSTORM_PORT: 3419, BRAINSTORM_DIR: dir, BRAINSTORM_TOKEN: 'authtok', BRAINSTORM_IDLE_TIMEOUT_MS: 400, BRAINSTORM_LIFECYCLE_CHECK_MS: 100 } });
+    const srv = spawn(nodeBin(), [SERVER], { env: { ...process.env, BRAINSTORM_PORT: 3419, BRAINSTORM_DIR: dir, BRAINSTORM_TOKEN: 'authtok', BRAINSTORM_IDLE_TIMEOUT_MS: 400, BRAINSTORM_LIFECYCLE_CHECK_MS: 100 } });
     let out = ''; srv.stdout.on('data', d => out += d.toString());
     let exited = false; srv.on('exit', () => { exited = true; });
     for (let i = 0; i < 60 && !out.includes('server-started'); i++) await sleep(50);

@@ -6,6 +6,17 @@ set -euo pipefail
 # Get the repository root (two levels up from tests/opencode/)
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 
+if [ -z "${NODE_BIN:-}" ]; then
+    NODE_BIN="$(command -v node || bash -lc 'command -v node' || command -v node.exe || true)"
+fi
+
+if [ -z "$NODE_BIN" ]; then
+    echo "Node.js not found. Set NODE_BIN to the node executable path."
+    exit 1
+fi
+
+export NODE_BIN
+
 # Create temp home directory for isolation
 export TEST_HOME
 TEST_HOME=$(mktemp -d)
@@ -26,6 +37,7 @@ SUPERPOWERS_PLUGIN_FILE="$SUPERPOWERS_DIR/.opencode/plugins/superpowers.js"
 # Install skills
 mkdir -p "$SUPERPOWERS_DIR"
 cp -r "$REPO_ROOT/skills" "$SUPERPOWERS_DIR/"
+cp "$REPO_ROOT/package.json" "$SUPERPOWERS_DIR/package.json"
 
 # Install plugin
 mkdir -p "$(dirname "$SUPERPOWERS_PLUGIN_FILE")"

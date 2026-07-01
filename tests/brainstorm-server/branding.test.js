@@ -7,6 +7,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
+const { nodeBin } = require('./node-bin.cjs');
 
 const REPO_ROOT = path.join(__dirname, '../..');
 const SERVER_PATH = path.join(REPO_ROOT, 'skills/brainstorming/scripts/server.cjs');
@@ -28,7 +29,7 @@ function sleep(ms) {
 
 function startServer({ port, dir, env = {}, serverPath = SERVER_PATH }) {
   cleanup(dir);
-  return spawn('node', [serverPath], {
+  return spawn(nodeBin(), [serverPath], {
     env: {
       ...process.env,
       BRAINSTORM_PORT: String(port),
@@ -78,9 +79,8 @@ function createPackagedServerFixture(version) {
   const root = fs.mkdtempSync(path.join('/tmp', 'superpowers-packaged-server-'));
   const scriptDir = path.join(root, 'skills/brainstorming/scripts');
   fs.cpSync(path.join(REPO_ROOT, 'skills/brainstorming/scripts'), scriptDir, { recursive: true });
-  fs.mkdirSync(path.join(root, '.codex-plugin'), { recursive: true });
   fs.writeFileSync(
-    path.join(root, '.codex-plugin/plugin.json'),
+    path.join(root, 'package.json'),
     JSON.stringify({ name: 'superpowers', version }, null, 2)
   );
   return {
@@ -270,9 +270,9 @@ async function main() {
     });
   });
 
-  await test('packaged Codex plugin reads version from .codex-plugin manifest', async () => {
+  await test('packaged OpenCode plugin reads version from package manifest', async () => {
     const port = 3457;
-    const dir = '/tmp/brainstorm-branding-packaged-codex';
+    const dir = '/tmp/brainstorm-branding-packaged-opencode';
     const packagedVersion = '7.8.9';
     const fixture = createPackagedServerFixture(packagedVersion);
 
@@ -309,28 +309,6 @@ async function main() {
       const html = await fetchHtml(port);
       assertBrandedFallbackText(html);
       assert(!html.includes(ASSET_URL), 'disabled telemetry should omit the remote image');
-    });
-  });
-
-  await test('DISABLE_TELEMETRY=true omits remote image for Claude Code telemetry opt-out', async () => {
-    const port = 3455;
-    const dir = '/tmp/brainstorm-branding-claude-disable-telemetry';
-    await withServer({ port, dir, env: { DISABLE_TELEMETRY: 'true' } }, async () => {
-      writeFragment(dir);
-      await sleep(300);
-      const html = await fetchHtml(port);
-      assertBrandedFallbackText(html);
-      assert(!html.includes(ASSET_URL), 'Claude Code telemetry opt-out should omit the remote image');
-    });
-  });
-
-  await test('CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 omits remote image for Claude Code traffic opt-out', async () => {
-    const port = 3456;
-    const dir = '/tmp/brainstorm-branding-claude-disable-nonessential';
-    await withServer({ port, dir, env: { CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1' } }, async () => {
-      const html = await fetchHtml(port);
-      assertBrandedFallbackText(html);
-      assert(!html.includes(ASSET_URL), 'Claude Code non-essential traffic opt-out should omit the remote image');
     });
   });
 

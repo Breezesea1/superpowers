@@ -44,10 +44,11 @@ const result = {
   scenario,
   firstBootstrapParts: countBootstrapParts(firstOutput),
   secondBootstrapParts: countBootstrapParts(secondOutput),
-  staleMentionMapping: bootstrapText(firstOutput).includes('@mention'),
-  staleTaskMapping: bootstrapText(firstOutput).includes('`Task` tool with subagents'),
-  mapsSubagentToTask: bootstrapText(firstOutput).includes('`task` with `subagent_type: "general"`'),
-  mapsMutationToApplyPatch: bootstrapText(firstOutput).includes('`apply_patch`'),
+    staleMentionMapping: bootstrapText(firstOutput).includes('@mention'),
+    staleTaskMapping: bootstrapText(firstOutput).includes('`Task` tool with subagents'),
+    mapsSubagentToAgents: bootstrapText(firstOutput).includes('focused `sp-*` agents'),
+    mapsImplementationToAgent: bootstrapText(firstOutput).includes('`sp-implementer`'),
+    mapsMutationToApplyPatch: bootstrapText(firstOutput).includes('`apply_patch`'),
   firstReadCount: afterFirst.readCount,
   secondReadCount: afterSecond.readCount,
   firstExistsCount: afterFirst.existsCount,
@@ -116,8 +117,11 @@ function assertPresentBootstrap(result) {
   if (result.staleTaskMapping) {
     failures.push('expected OpenCode bootstrap not to teach stale Task-tool mapping');
   }
-  if (!result.mapsSubagentToTask) {
-    failures.push('expected OpenCode bootstrap to map general-purpose subagents to task with subagent_type');
+  if (!result.mapsSubagentToAgents) {
+    failures.push('expected OpenCode bootstrap to map subagent dispatch to focused sp-* agents');
+  }
+  if (!result.mapsImplementationToAgent) {
+    failures.push('expected OpenCode bootstrap to mention sp-implementer for implementation work');
   }
   if (!result.mapsMutationToApplyPatch) {
     failures.push('expected OpenCode bootstrap to map file mutation to apply_patch');
