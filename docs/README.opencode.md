@@ -8,7 +8,7 @@ Add Superpowers to the `plugin` array in your global or project `opencode.json`:
 
 ```json
 {
-  "plugin": ["superpowers@git+https://github.com/obra/superpowers.git"]
+  "plugin": ["superpowers@git+https://github.com/Breezesea1/superpowers.git"]
 }
 ```
 
@@ -42,6 +42,35 @@ The plugin also registers recommended OpenCode agents through the config hook. U
 - `sp-implementer` - Scoped implementation with edit permissions.
 - `sp-reviewer` - Read-only code review.
 - `sp-docs-researcher` - Documentation and community research.
+
+#### Per-Agent Model And Overrides
+
+You can override any field on a registered agent (most commonly `model`) without losing the plugin's bundled `prompt`, `permission`, `description`, or `mode`. The plugin shallow-merges your definition onto its defaults:
+
+```json
+{
+  "agent": {
+    "sp-implementer": {
+      "model": "anthropic/claude-sonnet-4-20250514"
+    },
+    "sp-reviewer": {
+      "model": "openai/gpt-4o"
+    }
+  }
+}
+```
+
+To completely replace an agent's definition, provide all the fields you need — your object replaces the defaults field-by-field via shallow merge, so omitted fields still fall back to plugin defaults.
+
+To disable a plugin-registered agent entirely, set it to `false`:
+
+```json
+{
+  "agent": {
+    "sp-debugger": false
+  }
+}
+```
 
 ## Tool Mapping
 
@@ -85,7 +114,7 @@ To pin a specific version, use a branch or tag:
 
 ```json
 {
-  "plugin": ["superpowers@git+https://github.com/obra/superpowers.git#v6.0.3"]
+  "plugin": ["superpowers@git+https://github.com/Breezesea1/superpowers.git#v6.0.3"]
 }
 ```
 
@@ -102,7 +131,7 @@ To pin a specific version, use a branch or tag:
 Some Windows OpenCode builds have upstream installer issues with git-backed plugin specs. If OpenCode cannot install the plugin, try installing with system npm and pointing OpenCode at the local package:
 
 ```powershell
-npm install superpowers@git+https://github.com/obra/superpowers.git --prefix "$HOME\.config\opencode"
+npm install superpowers@git+https://github.com/Breezesea1/superpowers.git --prefix "$HOME\.config\opencode"
 ```
 
 Then use the installed package path in `opencode.json`:

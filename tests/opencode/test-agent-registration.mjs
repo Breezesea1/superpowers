@@ -17,6 +17,10 @@ const config = {
       description: 'User reviewer override',
       permission: { edit: 'ask' },
     },
+    'sp-implementer': {
+      model: 'anthropic/claude-haiku-4-20250514',
+    },
+    'sp-debugger': false,
   },
 };
 
@@ -26,7 +30,7 @@ const failures = [];
 
 assert(config.agent['superpowers-orchestrator'], 'expected superpowers-orchestrator to be registered');
 assert(config.agent['sp-explorer'], 'expected sp-explorer to be registered');
-assert(config.agent['sp-debugger'], 'expected sp-debugger to be registered');
+assert(!config.agent['sp-debugger'], 'expected sp-debugger to be opted out');
 assert(config.agent['sp-planner'], 'expected sp-planner to be registered');
 assert(config.agent['sp-implementer'], 'expected sp-implementer to be registered');
 assert(config.agent['sp-reviewer'], 'expected sp-reviewer to exist');
@@ -36,7 +40,13 @@ assert(config.agent['superpowers-orchestrator'].mode === 'primary', 'expected or
 assert(config.agent['superpowers-orchestrator'].permission?.task?.['sp-*'] === 'allow', 'expected orchestrator to allow sp-* tasks');
 assert(config.agent['superpowers-orchestrator'].permission?.task?.['*'] === 'deny', 'expected orchestrator to deny other tasks');
 assert(config.agent['sp-explorer'].mode === 'subagent', 'expected sp-explorer to be subagent');
-assert(config.agent['sp-implementer'].permission?.edit === 'allow', 'expected sp-implementer to allow edits');
+
+// Per-agent model override: user sets model, plugin defaults (prompt/permission) preserved
+assert(config.agent['sp-implementer'].model === 'anthropic/claude-haiku-4-20250514', 'expected sp-implementer model override to be applied');
+assert(config.agent['sp-implementer'].permission?.edit === 'allow', 'expected sp-implementer default permission to be preserved when only model is overridden');
+assert(config.agent['sp-implementer'].mode === 'subagent', 'expected sp-implementer default mode to be preserved when only model is overridden');
+
+// Full user override still works
 assert(config.agent['sp-reviewer'].description === 'User reviewer override', 'expected user sp-reviewer override to be preserved');
 assert(config.agent['sp-reviewer'].permission?.edit === 'ask', 'expected user sp-reviewer permission to be preserved');
 

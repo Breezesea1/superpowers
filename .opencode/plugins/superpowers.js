@@ -148,9 +148,16 @@ const recommendedAgents = {
 
 const registerRecommendedAgents = (config) => {
   config.agent = config.agent || {};
-  for (const [name, agent] of Object.entries(recommendedAgents)) {
-    if (!Object.prototype.hasOwnProperty.call(config.agent, name)) {
-      config.agent[name] = agent;
+  for (const [name, defaults] of Object.entries(recommendedAgents)) {
+    const userDef = config.agent[name];
+    if (userDef === false) continue; // explicit opt-out
+    // Shallow-merge user overrides onto plugin defaults so users can set
+    // per-agent `model` (or any field) without losing the bundled
+    // prompt/permission/description/mode.
+    if (userDef && typeof userDef === 'object') {
+      config.agent[name] = { ...defaults, ...userDef };
+    } else if (!Object.prototype.hasOwnProperty.call(config.agent, name)) {
+      config.agent[name] = defaults;
     }
   }
 };

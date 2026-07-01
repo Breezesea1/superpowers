@@ -2,13 +2,15 @@
 
 Superpowers is an OpenCode-focused software development methodology built from composable skills, a runtime bootstrap, and a recommended multi-agent setup.
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 ## Quickstart
 
 Add Superpowers to your OpenCode `opencode.json`:
 
 ```json
 {
-  "plugin": ["superpowers@git+https://github.com/obra/superpowers.git"]
+  "plugin": ["superpowers@git+https://github.com/Breezesea1/superpowers.git"]
 }
 ```
 
@@ -18,7 +20,7 @@ Restart OpenCode, then verify it is active by asking:
 Tell me about your superpowers
 ```
 
-See `.opencode/INSTALL.md` and `docs/README.opencode.md` for full setup and troubleshooting.
+See [`.opencode/INSTALL.md`](.opencode/INSTALL.md) and [`docs/README.opencode.md`](docs/README.opencode.md) for full setup and troubleshooting.
 
 ## How It Works
 
@@ -41,6 +43,21 @@ The plugin automatically registers these agents unless the user has already defi
 - `sp-implementer` - Scoped implementation with edit permissions.
 - `sp-reviewer` - Read-only code review focused on bugs, regressions, and missing tests.
 - `sp-docs-researcher` - External documentation and community research.
+
+### Per-Agent Model
+
+Override the model for a specific agent in your `opencode.json` — the plugin's bundled prompt and permissions are preserved:
+
+```json
+{
+  "agent": {
+    "sp-implementer": { "model": "anthropic/claude-sonnet-4-20250514" },
+    "sp-reviewer": { "model": "openai/gpt-4o" }
+  }
+}
+```
+
+Set an agent to `false` to disable it entirely. See [docs/README.opencode.md](docs/README.opencode.md) for full details.
 
 ## Basic Workflow
 
@@ -82,5 +99,5 @@ The optional brainstorming visual companion loads the Prime Radiant logo from ou
 Superpowers is built by [Jesse Vincent](https://blog.fsck.com) and [Prime Radiant](https://primeradiant.com).
 
 - Discord: https://discord.gg/35wsABTejz
-- Issues: https://github.com/obra/superpowers/issues
+- Issues: https://github.com/Breezesea1/superpowers/issues
 - Release announcements: https://primeradiant.com/superpowers/

@@ -10,7 +10,7 @@ Add Superpowers to the `plugin` array in your global or project `opencode.json`:
 
 ```json
 {
-  "plugin": ["superpowers@git+https://github.com/obra/superpowers.git"]
+  "plugin": ["superpowers@git+https://github.com/Breezesea1/superpowers.git"]
 }
 ```
 
@@ -42,7 +42,7 @@ To pin a specific version:
 
 ```json
 {
-  "plugin": ["superpowers@git+https://github.com/obra/superpowers.git#v6.0.3"]
+  "plugin": ["superpowers@git+https://github.com/Breezesea1/superpowers.git#v6.0.3"]
 }
 ```
 
@@ -59,7 +59,7 @@ To pin a specific version:
 Some Windows OpenCode builds have upstream installer issues with git-backed plugin specs, including cache paths for `git+https` URLs and Bun not finding `git.exe` even when it works in a normal terminal. If OpenCode cannot install the plugin, try installing with system npm and pointing OpenCode at the local package:
 
 ```powershell
-npm install superpowers@git+https://github.com/obra/superpowers.git --prefix "$HOME\.config\opencode"
+npm install superpowers@git+https://github.com/Breezesea1/superpowers.git --prefix "$HOME\.config\opencode"
 ```
 
 Then use the installed package path in `opencode.json`:
