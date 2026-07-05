@@ -4,7 +4,7 @@ description: Use when starting any conversation - establishes how to find and us
 ---
 
 <SUBAGENT-STOP>
-If you were dispatched as a subagent to execute a specific task, skip this skill.
+If you were dispatched as a subagent to execute a specific task, skip this skill AND do not invoke any other skill (brainstorming, writing-plans, etc.) that would ask the user questions. Subagents must not ask the user anything — if information is missing, report the gap in your final message and return. Skip skill invocation entirely and just execute the assigned task.
 </SUBAGENT-STOP>
 
 <EXTREMELY-IMPORTANT>

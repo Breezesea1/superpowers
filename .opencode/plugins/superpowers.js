@@ -72,43 +72,46 @@ const recommendedAgents = {
   'sp-explorer': {
     description: 'Read-only repository exploration and codebase mapping.',
     mode: 'subagent',
-    prompt: 'Explore the repository without editing. Return concise findings with relevant file paths, architecture notes, and risks.',
+    prompt: 'Explore the repository without editing. Return concise findings with relevant file paths, architecture notes, and risks. If the task is ambiguous or information is missing, report what you found and what is missing instead of asking the user.',
     permission: {
       read: 'allow',
       glob: 'allow',
       grep: 'allow',
       bash: 'ask',
       edit: 'deny',
+      question: 'deny',
     },
   },
   'sp-debugger': {
     description: 'Systematic debugging, reproduction, and root-cause analysis.',
     mode: 'subagent',
-    prompt: 'Debug systematically. Reproduce failures when possible, gather evidence, identify root cause, and recommend the smallest correct fix.',
+    prompt: 'Debug systematically. Reproduce failures when possible, gather evidence, identify root cause, and recommend the smallest correct fix. If you cannot reproduce or need more information, report the blocker and your best hypothesis instead of asking the user.',
     permission: {
       read: 'allow',
       glob: 'allow',
       grep: 'allow',
       bash: 'allow',
       edit: 'deny',
+      question: 'deny',
     },
   },
   'sp-planner': {
     description: 'Read-only implementation planning after requirements are understood.',
     mode: 'subagent',
-    prompt: 'Create implementation plans only. Do not edit files. Include exact files, sequencing, tests, risks, and review checkpoints.',
+    prompt: 'Create implementation plans only. Do not edit files. Include exact files, sequencing, tests, risks, and review checkpoints. If requirements are unclear, document the assumptions you made and proceed rather than asking the user.',
     permission: {
       read: 'allow',
       glob: 'allow',
       grep: 'allow',
       bash: 'ask',
       edit: 'deny',
+      question: 'deny',
     },
   },
   'sp-implementer': {
     description: 'Focused implementation agent for scoped coding tasks.',
     mode: 'subagent',
-    prompt: 'Implement the assigned task only. Prefer minimal changes, keep style consistent, and verify the changed behavior when practical.',
+    prompt: 'Implement the assigned task only. Prefer minimal changes, keep style consistent, and verify the changed behavior when practical. If the task scope is unclear, implement the most reasonable interpretation and note the decision; do not ask the user.',
     permission: {
       read: 'allow',
       glob: 'allow',
@@ -117,24 +120,26 @@ const recommendedAgents = {
       bash: 'allow',
       skill: 'allow',
       todowrite: 'allow',
+      question: 'deny',
     },
   },
   'sp-reviewer': {
     description: 'Read-only review for bugs, regressions, missing tests, and maintainability risks.',
     mode: 'subagent',
-    prompt: 'Review changes without editing. Prioritize findings by severity with file references, then list residual risks and missing verification.',
+    prompt: 'Review changes without editing. Prioritize findings by severity with file references, then list residual risks and missing verification. If you cannot access something needed for review, report the gap and review what is available instead of asking the user.',
     permission: {
       read: 'allow',
       glob: 'allow',
       grep: 'allow',
       bash: 'ask',
       edit: 'deny',
+      question: 'deny',
     },
   },
   'sp-docs-researcher': {
     description: 'Research current library, framework, API, and community documentation.',
     mode: 'subagent',
-    prompt: 'Research external documentation and community examples. Return source-backed findings, current API details, and practical recommendations.',
+    prompt: 'Research external documentation and community examples. Return source-backed findings, current API details, and practical recommendations. If a source is unreachable, report that and use the best available alternatives instead of asking the user.',
     permission: {
       webfetch: 'allow',
       bash: 'ask',
@@ -142,6 +147,7 @@ const recommendedAgents = {
       glob: 'allow',
       grep: 'allow',
       edit: 'deny',
+      question: 'deny',
     },
   },
 };
@@ -153,9 +159,15 @@ const registerRecommendedAgents = (config) => {
     if (userDef === false) continue; // explicit opt-out
     // Shallow-merge user overrides onto plugin defaults so users can set
     // per-agent `model` (or any field) without losing the bundled
-    // prompt/permission/description/mode.
+    // prompt/permission/description/mode. For `permission` specifically we
+    // deep-merge so user overrides (e.g. { edit: 'ask' }) do not erase the
+    // plugin's safety defaults like { question: 'deny' }.
     if (userDef && typeof userDef === 'object') {
-      config.agent[name] = { ...defaults, ...userDef };
+      const merged = { ...defaults, ...userDef };
+      if (defaults.permission || userDef.permission) {
+        merged.permission = { ...defaults.permission, ...userDef.permission };
+      }
+      config.agent[name] = merged;
     } else if (!Object.prototype.hasOwnProperty.call(config.agent, name)) {
       config.agent[name] = defaults;
     }

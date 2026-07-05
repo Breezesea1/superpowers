@@ -50,6 +50,11 @@ assert(config.agent['sp-implementer'].mode === 'subagent', 'expected sp-implemen
 assert(config.agent['sp-reviewer'].description === 'User reviewer override', 'expected user sp-reviewer override to be preserved');
 assert(config.agent['sp-reviewer'].permission?.edit === 'ask', 'expected user sp-reviewer permission to be preserved');
 
+// All sp-* subagents must deny the question tool so subagents never ask the user
+for (const name of ['sp-explorer', 'sp-planner', 'sp-implementer', 'sp-reviewer', 'sp-docs-researcher']) {
+  assert(config.agent[name]?.permission?.question === 'deny', `expected ${name} to deny question tool`);
+}
+
 if (failures.length > 0) {
   console.error(JSON.stringify(config.agent, null, 2));
   for (const failure of failures) {
